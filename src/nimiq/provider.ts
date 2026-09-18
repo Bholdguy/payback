@@ -1,4 +1,5 @@
 import { init as sdkInit, type NimiqProvider } from '@nimiq/mini-app-sdk'
+import { describeUnknown } from './describeUnknown'
 
 /**
  * Wraps `@nimiq/mini-app-sdk` (ARCHITECTURE.md 2.2). `init()` is called once
@@ -67,27 +68,67 @@ export interface SendBasicTransactionParams {
  * test's actual output can be captured and compared against this comment
  * rather than guessed at again later.
  */
+export type SendBasicTransactionStage = 'getProvider' | 'call' | 'non-string-result'
+
 export type SendBasicTransactionOutcome =
   | { kind: 'success'; txHash: string; raw: unknown }
-  | { kind: 'error'; raw: unknown }
+  | { kind: 'error'; stage: SendBasicTransactionStage; raw: unknown }
 
+/**
+ * @param onLog Optional step-by-step reporter, called at every stage of this
+ *   call. Exists because a real device may have no remote debugging attached
+ *   (confirmed the case during Step 5's investigation) — `console.log` alone
+ *   is then invisible to whoever is testing. Callers that need on-screen
+ *   visibility should render each message; `console.log`/`console.error`
+ *   still fire unconditionally below for when a console *is* available.
+ */
 export async function sendBasicTransactionWithData(
   params: SendBasicTransactionParams,
+  onLog?: (message: string) => void,
 ): Promise<SendBasicTransactionOutcome> {
-  const provider = await getProvider()
+  const log = (message: string) => {
+    console.log(`[nimiq/provider] ${message}`)
+    onLog?.(message)
+  }
+
+  log(`sendBasicTransactionWithData called with params: ${describeUnknown(params)}`)
+  log(
+    `param types: recipient=${typeof params.recipient} (len=${params.recipient?.length}), value=${typeof params.value} (isInteger=${Number.isInteger(params.value)}), data=${typeof params.data} (len=${params.data?.length})`,
+  )
+
+  let provider: NimiqProvider
+  try {
+    log('awaiting getProvider() (init)…')
+    provider = await getProvider()
+    log('getProvider() resolved')
+  } catch (err) {
+    const desc = describeUnknown(err)
+    console.error('[nimiq/provider] getProvider() (init) threw:', err)
+    log(`getProvider() (init) threw: ${desc}`)
+    return { kind: 'error', stage: 'getProvider', raw: err }
+  }
+
+  log(`typeof provider.sendBasicTransactionWithData: ${typeof provider.sendBasicTransactionWithData}`)
 
   let result: unknown
   try {
+    log('calling provider.sendBasicTransactionWithData(params)…')
     result = await provider.sendBasicTransactionWithData(params)
+    log('provider.sendBasicTransactionWithData(params) returned (did not throw)')
   } catch (err) {
+    const desc = describeUnknown(err)
     console.error('[nimiq/provider] sendBasicTransactionWithData threw:', err)
-    return { kind: 'error', raw: err }
+    log(`sendBasicTransactionWithData threw: ${desc}`)
+    return { kind: 'error', stage: 'call', raw: err }
   }
 
+  const desc = describeUnknown(result)
   console.log('[nimiq/provider] sendBasicTransactionWithData resolved:', result)
+  log(`sendBasicTransactionWithData resolved with: ${desc}`)
 
   if (typeof result === 'string') {
     return { kind: 'success', txHash: result, raw: result }
   }
-  return { kind: 'error', raw: result }
+  log(`resolved value is not a string tx hash (typeof=${typeof result}) — treating as error`)
+  return { kind: 'error', stage: 'non-string-result', raw: result }
 }

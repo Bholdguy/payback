@@ -27,6 +27,13 @@ export function PayerView({ requestId }: { requestId: string }) {
   const data = useQuery(api.requests.getRequest, { requestId: requestId as Id<'requests'> })
   const recordBroadcast = useMutation(api.paymentEvents.recordBroadcast)
   const [attempts, setAttempts] = useState<Record<string, LocalAttemptState>>({})
+  const [debugLog, setDebugLog] = useState<string[]>([])
+
+  const log = (message: string) => {
+    const line = `${new Date().toISOString().slice(11, 23)} ${message}`
+    console.log(`[PayerView] ${message}`)
+    setDebugLog((prev) => [...prev, line])
+  }
 
   if (!isInsideNimiqPay()) {
     return (
@@ -48,43 +55,68 @@ export function PayerView({ requestId }: { requestId: string }) {
   const { request, participants } = data
 
   async function pay(participantId: Id<'participants'>, shareAmount: number) {
+    log(`pay() called: participantId=${participantId}, shareAmount=${shareAmount}`)
+    log(`isInsideNimiqPay()=${isInsideNimiqPay()}, recipient=${request.requester_wallet}, memo=${JSON.stringify(request.memo)}`)
     setAttempts((prev) => ({ ...prev, [participantId]: { kind: 'sending' } }))
 
-    const outcome = await sendBasicTransactionWithData({
-      recipient: request.requester_wallet,
-      value: shareAmount,
-      data: request.memo,
-    })
+    try {
+      const outcome = await sendBasicTransactionWithData(
+        {
+          recipient: request.requester_wallet,
+          value: shareAmount,
+          data: request.memo,
+        },
+        log,
+      )
 
-    if (outcome.kind === 'error') {
+      log(`pay() received outcome.kind=${outcome.kind}${outcome.kind === 'error' ? ` stage=${outcome.stage}` : ''}`)
+
+      if (outcome.kind === 'error') {
+        setAttempts((prev) => ({
+          ...prev,
+          [participantId]: {
+            kind: 'error',
+            message: 'Payment not completed. Try again.',
+          },
+        }))
+        return
+      }
+
+      try {
+        log(`calling recordBroadcast with txHash=${outcome.txHash}`)
+        await recordBroadcast({
+          participantId,
+          txHash: outcome.txHash,
+          providerResult: JSON.stringify(outcome.raw),
+        })
+        log('recordBroadcast succeeded')
+        setAttempts((prev) => ({ ...prev, [participantId]: { kind: 'idle' } }))
+      } catch (err) {
+        // The broadcast genuinely happened on-chain-adjacent (wallet accepted
+        // it); this is a Convex-write failure, not a payment failure. Surface
+        // it distinctly rather than offering a retry that would double-spend.
+        log(`recordBroadcast threw: ${err instanceof Error ? err.message : String(err)}`)
+        setAttempts((prev) => ({
+          ...prev,
+          [participantId]: {
+            kind: 'error',
+            message: `Payment was sent, but we couldn't record it: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          },
+        }))
+      }
+    } catch (err) {
+      // Defensive: nothing above should throw past sendBasicTransactionWithData
+      // (it catches internally), but this closes the gap completely so a
+      // failure here is never a permanently stuck "Waiting for approval…"
+      // with no way to see what happened or retry.
+      log(`pay() caught an unexpected top-level error: ${err instanceof Error ? err.message : String(err)}`)
       setAttempts((prev) => ({
         ...prev,
         [participantId]: {
           kind: 'error',
           message: 'Payment not completed. Try again.',
-        },
-      }))
-      return
-    }
-
-    try {
-      await recordBroadcast({
-        participantId,
-        txHash: outcome.txHash,
-        providerResult: JSON.stringify(outcome.raw),
-      })
-      setAttempts((prev) => ({ ...prev, [participantId]: { kind: 'idle' } }))
-    } catch (err) {
-      // The broadcast genuinely happened on-chain-adjacent (wallet accepted
-      // it); this is a Convex-write failure, not a payment failure. Surface
-      // it distinctly rather than offering a retry that would double-spend.
-      setAttempts((prev) => ({
-        ...prev,
-        [participantId]: {
-          kind: 'error',
-          message: `Payment was sent, but we couldn't record it: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
         },
       }))
     }
@@ -126,6 +158,25 @@ export function PayerView({ requestId }: { requestId: string }) {
           )
         })}
       </ul>
+
+      {/* Temporary diagnostic panel for the Step 5 silent-failure investigation
+          (no remote debugging available on the test device — this is the only
+          way to see what's happening step by step). Not part of the product
+          UI; safe to remove once the payment trigger issue is confirmed fixed. */}
+      {debugLog.length > 0 && (
+        <pre
+          style={{
+            marginTop: '2rem',
+            padding: '0.75rem',
+            background: '#f4f3ec',
+            fontSize: '0.75rem',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+        >
+          {debugLog.join('\n')}
+        </pre>
+      )}
     </main>
   )
 }
