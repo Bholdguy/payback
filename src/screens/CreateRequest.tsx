@@ -1,7 +1,7 @@
-import { init } from '@nimiq/mini-app-sdk'
 import { useMutation } from 'convex/react'
 import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
+import { listAccounts } from '../nimiq/provider'
 import { generateRequestLinks } from '../request/RequestLinkGenerator'
 import { AmountParseError, formatLunaAsNim, parseNimToLuna } from '../split/amount'
 import { SplitCalculatorError, splitCalculator } from '../split/SplitCalculator'
@@ -30,8 +30,7 @@ export function CreateRequest() {
 
   useEffect(() => {
     let cancelled = false
-    init({ timeout: 10_000 })
-      .then((provider) => provider.listAccounts())
+    listAccounts()
       .then((result) => {
         if (cancelled) return
         if (Array.isArray(result) && result.length > 0) {
