@@ -1,6 +1,7 @@
 import { useMutation } from 'convex/react'
 import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
+import { timeGreeting } from '../greeting'
 import { useRequesterWallet } from '../nimiq/useRequesterWallet'
 import { generateRequestLinks } from '../request/RequestLinkGenerator'
 import { AmountParseError, formatLunaAsNim, parseNimToLuna } from '../split/amount'
@@ -49,24 +50,30 @@ export function CreateRequest() {
 
   if (generated) {
     const links = APP_URL ? generateRequestLinks(generated.requestId, APP_URL) : null
+    const total = generated.shares.reduce((a, b) => a + b, 0)
 
     return (
       <main className="screen stack">
-        <div className="card stack">
-          <h1>Request sent</h1>
-          <p className="muted">This amount is locked in — sharing the link won't change it.</p>
-          <ul className="participant-list">
-            {generated.shares.map((share, i) => (
-              <li key={i} className="participant-row">
-                <span>Person {i + 1}</span>
-                <span className="amount-small">{formatLunaAsNim(share)}</span>
-              </li>
-            ))}
-          </ul>
+        <div className="card">
+          <p className="hero-sub">Request sent — locked in</p>
+          <p className="hero-stat">{formatLunaAsNim(total)}</p>
+          <p className="hero-sub">Sharing the link won't change this amount.</p>
         </div>
 
+        <ul className="participant-list">
+          {generated.shares.map((share, i) => (
+            <li key={i} className="participant-card">
+              <span className="status-dot" />
+              <span className="participant-main">
+                <span>Person {i + 1}</span>
+              </span>
+              <span className="amount-small">{formatLunaAsNim(share)}</span>
+            </li>
+          ))}
+        </ul>
+
         {links ? (
-          <a className="btn btn-primary" href={links.nimiqPayDeeplink}>
+          <a className="btn btn-primary cta-float" href={links.nimiqPayDeeplink}>
             Share link
           </a>
         ) : (
@@ -82,47 +89,51 @@ export function CreateRequest() {
 
   return (
     <main className="screen">
-      <a className="top-link" href="/dashboard">
+      <a className="top-nav" href="/dashboard">
         Your requests
       </a>
 
-      <h1>Request money</h1>
-      <p className="muted" style={{ marginBottom: '1.25rem' }}>
-        Split a bill and get paid straight to your account.
-      </p>
+      <div className="greeting">
+        <h1>
+          {timeGreeting()} — let's split a bill
+        </h1>
+        <p className="muted">Get paid back straight to your account.</p>
+      </div>
 
       <div className="stack">
-        <div className="field">
-          <label htmlFor="total">Total amount (NIM)</label>
-          <input
-            id="total"
-            type="text"
-            inputMode="decimal"
-            value={totalInput}
-            onChange={(e) => setTotalInput(e.target.value)}
-          />
-        </div>
+        <div className="card stack">
+          <div className="field">
+            <label htmlFor="total">Total amount (NIM)</label>
+            <input
+              id="total"
+              type="text"
+              inputMode="decimal"
+              value={totalInput}
+              onChange={(e) => setTotalInput(e.target.value)}
+            />
+          </div>
 
-        <div className="field">
-          <label htmlFor="participants">Split between how many people?</label>
-          <input
-            id="participants"
-            type="text"
-            inputMode="numeric"
-            value={participantCountInput}
-            onChange={(e) => setParticipantCountInput(e.target.value)}
-          />
-        </div>
+          <div className="field">
+            <label htmlFor="participants">Split between how many people?</label>
+            <input
+              id="participants"
+              type="text"
+              inputMode="numeric"
+              value={participantCountInput}
+              onChange={(e) => setParticipantCountInput(e.target.value)}
+            />
+          </div>
 
-        <div className="field">
-          <label htmlFor="memo">What's it for?</label>
-          <input
-            id="memo"
-            type="text"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="Dinner at Taco Spot"
-          />
+          <div className="field">
+            <label htmlFor="memo">What's it for?</label>
+            <input
+              id="memo"
+              type="text"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="Dinner at Taco Spot"
+            />
+          </div>
         </div>
 
         <div className="card">
@@ -130,8 +141,11 @@ export function CreateRequest() {
           {preview.shares ? (
             <ul className="participant-list">
               {preview.shares.map((share, i) => (
-                <li key={i} className="participant-row">
-                  <span>Person {i + 1}</span>
+                <li key={i} className="participant-card">
+                  <span className="status-dot" />
+                  <span className="participant-main">
+                    <span>Person {i + 1}</span>
+                  </span>
                   <span className="amount-small">{formatLunaAsNim(share)}</span>
                 </li>
               ))}
@@ -146,7 +160,7 @@ export function CreateRequest() {
 
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary cta-float"
           disabled={!canGenerate}
           onClick={async () => {
             if (!preview.shares || preview.totalLuna === null || !requesterWallet) return
@@ -167,7 +181,7 @@ export function CreateRequest() {
             }
           }}
         >
-          {isSubmitting ? 'Sending…' : 'Request'}
+          {isSubmitting ? 'Sending…' : 'Generate request'}
         </button>
       </div>
     </main>

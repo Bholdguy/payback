@@ -22,15 +22,26 @@ function ParticipantRow({
   const status = useQuery(api.paymentEvents.getParticipantStatus, { participantId })
   if (!status) return null
   const { participant, latestEvent, broadcastToConfirmedLatencyMs } = status
+  const dotClass =
+    participant.status === 'paid'
+      ? 'is-success'
+      : participant.status === 'failed'
+        ? 'is-failed'
+        : participant.status === 'broadcast'
+          ? 'is-pending'
+          : ''
 
   return (
-    <li className="participant-row" style={{ padding: '0.5rem 0' }}>
-      <span>{formatLunaAsNim(shareAmount)}</span>
-      <span className={participant.status === 'paid' ? 'status-paid' : 'status-text'}>
-        {STATUS_LABEL[participant.status] ?? participant.status}
-        {latestEvent?.confirmed_at != null && broadcastToConfirmedLatencyMs !== null && (
-          <span className="muted"> · confirmed in {(broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s</span>
-        )}
+    <li className="participant-card">
+      <span className={`status-dot ${dotClass}`} />
+      <span className="participant-main">
+        <span>{formatLunaAsNim(shareAmount)}</span>
+        <span className={participant.status === 'paid' ? 'status-success' : 'status-text'}>
+          {STATUS_LABEL[participant.status] ?? participant.status}
+          {latestEvent?.confirmed_at != null && broadcastToConfirmedLatencyMs !== null && (
+            <> · {(broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s</>
+          )}
+        </span>
       </span>
     </li>
   )
@@ -43,11 +54,15 @@ function RequestDetail({ requestId }: { requestId: Id<'requests'> }) {
   if (data === null) return <p className="muted">This request doesn't exist.</p>
 
   const { request, participants } = data
+  const paidCount = participants.filter((p) => p.status === 'paid').length
 
   return (
     <div className="card">
+      <p className="hero-sub stat-accent">
+        {paidCount} of {participants.length} paid
+      </p>
       <p className="amount-small">{formatLunaAsNim(request.total_amount)}</p>
-      <p>{request.memo}</p>
+      <p className="muted">{request.memo}</p>
       <p className="muted">Created {new Date(request._creationTime).toLocaleString()}</p>
       <ul className="participant-list" style={{ marginTop: '0.75rem' }}>
         {participants.map((p) => (
@@ -99,37 +114,41 @@ export function RequesterDashboard() {
 
   return (
     <main className="screen">
-      <a className="top-link" href="/">
+      <a className="top-nav" href="/">
         New request
       </a>
-      <h1>Your requests</h1>
+
+      <div className="greeting">
+        <h1>Your requests</h1>
+        <p className="muted">Track who's paid, and compare requests side by side.</p>
+      </div>
 
       {requests.length === 0 ? (
         <p className="muted">No requests yet.</p>
       ) : (
-        <>
-          <p className="muted" style={{ marginBottom: '0.75rem' }}>
-            Select up to two to compare.
-          </p>
-          <ul className="request-list card">
+        <div className="stack">
+          <p className="muted">Select up to two to compare.</p>
+          <ul className="stack" style={{ gap: '0.6rem' }}>
             {requests.map(({ request, paidCount, totalCount }) => (
               <li key={request._id}>
-                <label>
+                <label className="stat-card" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={selected.includes(request._id)}
                     onChange={() => toggleSelect(request._id)}
                   />
-                  <span style={{ flex: 1 }}>{request.memo}</span>
-                  <span className="amount-small">{formatLunaAsNim(request.total_amount)}</span>
-                  <span className="muted">
-                    {paidCount}/{totalCount} paid
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block' }}>{request.memo}</span>
+                    <span className="muted">{formatLunaAsNim(request.total_amount)}</span>
+                  </span>
+                  <span className="hero-stat stat-accent" style={{ fontSize: '1.4rem' }}>
+                    {paidCount}/{totalCount}
                   </span>
                 </label>
               </li>
             ))}
           </ul>
-        </>
+        </div>
       )}
 
       {selected.length > 0 && (

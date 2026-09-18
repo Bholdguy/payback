@@ -151,56 +151,67 @@ export function PayerView({ requestId }: { requestId: string }) {
 
   return (
     <main className="screen stack">
-      <div>
-        <h1>{request.memo}</h1>
-        <p className="muted">
-          {formatLunaAsNim(request.total_amount)} total · Requested by{' '}
-          {formatAddressShort(request.requester_wallet)}
+      <div className="card">
+        <p className="hero-sub">Requested</p>
+        <p className="hero-stat">{formatLunaAsNim(request.total_amount)}</p>
+        <p className="hero-sub">
+          {request.memo} · from {formatAddressShort(request.requester_wallet)}
         </p>
       </div>
 
       <ul className="participant-list">
         {participants.map((p) => {
           const attempt = attempts[p._id] ?? { kind: 'idle' as const }
+          const dotClass =
+            p.status === 'paid'
+              ? 'is-success'
+              : p.status === 'failed' || attempt.kind === 'error'
+                ? 'is-failed'
+                : p.status === 'broadcast' || attempt.kind === 'sending'
+                  ? 'is-pending'
+                  : ''
           return (
-            <li key={p._id} className="card stack" style={{ gap: '0.5rem' }}>
-              <div className="participant-row" style={{ padding: 0 }}>
-                <span className="amount-small">{formatLunaAsNim(p.share_amount)}</span>
-
-                <span>
-                  {p.status === 'pending' && attempt.kind !== 'sending' && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-small"
-                      onClick={() => pay(p._id, p.share_amount)}
-                    >
-                      Pay
-                    </button>
-                  )}
+            <li key={p._id} className="stack" style={{ gap: '0.4rem' }}>
+              <div className="participant-card">
+                <span className={`status-dot ${dotClass}`} />
+                <span className="participant-main">
+                  <span className="amount-small">{formatLunaAsNim(p.share_amount)}</span>
                   {attempt.kind === 'sending' && (
                     <span className="status-text">Waiting for approval…</span>
                   )}
-                  {p.status === 'broadcast' && <span className="status-text">Broadcasting…</span>}
+                  {p.status === 'broadcast' && attempt.kind !== 'sending' && (
+                    <span className="status-text">Broadcasting…</span>
+                  )}
                   {p.status === 'paid' && (
-                    <span className="status-paid">
+                    <span className="status-success">
                       Paid
                       <PaidLatency participantId={p._id} />
                     </span>
                   )}
-                  {(p.status === 'failed' || attempt.kind === 'error') &&
-                    attempt.kind !== 'sending' && (
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-small"
-                        onClick={() => pay(p._id, p.share_amount)}
-                      >
-                        Try again
-                      </button>
-                    )}
                 </span>
+
+                {p.status === 'pending' && attempt.kind !== 'sending' && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-small"
+                    onClick={() => pay(p._id, p.share_amount)}
+                  >
+                    Pay
+                  </button>
+                )}
+                {(p.status === 'failed' || attempt.kind === 'error') &&
+                  attempt.kind !== 'sending' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-small"
+                      onClick={() => pay(p._id, p.share_amount)}
+                    >
+                      Try again
+                    </button>
+                  )}
               </div>
               {attempt.kind === 'error' && (
-                <p role="alert" className="alert alert-error" style={{ margin: 0 }}>
+                <p role="alert" className="alert alert-error">
                   {attempt.message}
                 </p>
               )}
