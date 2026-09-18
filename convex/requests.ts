@@ -72,3 +72,34 @@ export const getRequest = query({
     return { request, participants }
   },
 })
+
+/**
+ * Read-only, scoped to `requester_wallet` (ARCHITECTURE.md 2.1: "this screen
+ * is read-only against Convex; it has no mutation calls at all"). Newest
+ * first (`DECISIONS.md` #5) — `by_requester_wallet`'s index order already
+ * ends in `_creationTime`, so `.order('desc')` is exactly newest-first.
+ */
+export const listRequestsByWallet = query({
+  args: { requesterWallet: v.string() },
+  handler: async (ctx, args) => {
+    const requests = await ctx.db
+      .query('requests')
+      .withIndex('by_requester_wallet', (q) => q.eq('requester_wallet', args.requesterWallet))
+      .order('desc')
+      .collect()
+
+    return Promise.all(
+      requests.map(async (request) => {
+        const participants = await ctx.db
+          .query('participants')
+          .withIndex('by_request_id', (q) => q.eq('request_id', request._id))
+          .collect()
+        return {
+          request,
+          paidCount: participants.filter((p) => p.status === 'paid').length,
+          totalCount: participants.length,
+        }
+      }),
+    )
+  },
+})

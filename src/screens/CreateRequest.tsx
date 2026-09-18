@@ -1,7 +1,7 @@
 import { useMutation } from 'convex/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
-import { listAccounts } from '../nimiq/provider'
+import { useRequesterWallet } from '../nimiq/useRequesterWallet'
 import { generateRequestLinks } from '../request/RequestLinkGenerator'
 import { AmountParseError, formatLunaAsNim, parseNimToLuna } from '../split/amount'
 import { SplitCalculatorError, splitCalculator } from '../split/SplitCalculator'
@@ -25,32 +25,7 @@ export function CreateRequest() {
   )
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [requesterWallet, setRequesterWallet] = useState<string | null>(null)
-  const [walletError, setWalletError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    listAccounts()
-      .then((result) => {
-        if (cancelled) return
-        if (Array.isArray(result) && result.length > 0) {
-          setRequesterWallet(result[0])
-        } else {
-          setWalletError('No wallet account available from Nimiq Pay.')
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setWalletError(
-            'Could not reach the Nimiq wallet — open this app inside Nimiq Pay to create a request.',
-          )
-          console.error(err)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
+  const { wallet: requesterWallet, error: walletError } = useRequesterWallet()
 
   const preview = useMemo(() => {
     try {
@@ -108,6 +83,9 @@ export function CreateRequest() {
   return (
     <main style={{ fontFamily: 'system-ui', padding: '1.5rem', maxWidth: 420 }}>
       <h1>New request</h1>
+      <p>
+        <a href="/dashboard">View your requests</a>
+      </p>
 
       <label style={{ display: 'block', marginBottom: '1rem' }}>
         Total (NIM)

@@ -86,14 +86,15 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 
 **Same disclosed blocker as Step 6:** all of the above is verified against mocked RPC responses; the retry flow has not been exercised against a real device or a real confirmation-job timeout in production (`NIMIQ_RPC_URL` still unset).
 
-## Step 8 — Requester dashboard (replay/compare)
+## Step 8 — Requester dashboard (replay/compare) ✅ DONE
 
-- [ ] Implement `listRequestsByWallet` query, sorted **newest-first** (`DECISIONS.md` #5).
-- [ ] Build `RequesterDashboard.tsx`: list view with paid/unpaid counts; detail view with full participant list and timestamps.
-- [ ] Build the side-by-side compare view (two `getRequest` reads rendered together).
-- [ ] Confirm this screen has zero mutation calls — read-only against Convex (`ARCHITECTURE.md` Section 2.1).
-- [ ] Test: dashboard reflects a request created five minutes ago and one created yesterday identically, in newest-first order.
-- [ ] Test: two requests render correctly side by side.
+- [x] Implement `listRequestsByWallet` query, sorted **newest-first** (`DECISIONS.md` #5). — `convex/requests.ts`; also returns `paidCount`/`totalCount` per request (computed server-side, avoiding an N+1 client-side fetch) since the list view needs them.
+- [x] Build `RequesterDashboard.tsx`: list view with paid/unpaid counts; detail view with full participant list and timestamps. — reachable at `/dashboard`; per-participant rows use `getParticipantStatus` (Step 6) to show broadcast/confirmed timestamps and latency once paid.
+- [x] Build the side-by-side compare view (two `getRequest` reads rendered together). — selecting two requests (checkboxes) renders both `RequestDetail` panels side by side; selecting a third slides the selection window rather than growing past two.
+- [x] Confirm this screen has zero mutation calls — read-only against Convex (`ARCHITECTURE.md` Section 2.1). — verified by grep; no `useMutation` anywhere in `RequesterDashboard.tsx`.
+- [x] Test: dashboard reflects a request created five minutes ago and one created yesterday identically, in newest-first order. — `convex/dashboard.test.ts`.
+- [x] Test: two requests render correctly side by side. — same file; each `getRequest` read verified independent and correct.
+- Extracted `useRequesterWallet()` (`src/nimiq/useRequesterWallet.ts`) out of `CreateRequest.tsx`, now shared with `RequesterDashboard.tsx` — same wallet-detection logic, not duplicated a second time.
 
 ## Step 9 — Design pass
 
