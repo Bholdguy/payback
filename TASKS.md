@@ -75,7 +75,7 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 1. ~~`NIMIQ_RPC_URL` has never been provisioned anywhere~~ — **resolved.** Set and verified reachable end to end against the live deployment (`DECISIONS.md` #6).
 2. ~~Network mismatch (testnet config vs. mainnet RPC)~~ — **resolved.** Confirmed on the real device: this Nimiq Pay build has no testnet mode at all, only a mainnet balance and top-up address. `NIMIQ_NETWORK` corrected to `mainnet` in `.env.local`, matching reality and matching `rpc.nimiqwatch.com` (`DECISIONS.md` #6). **Consequence, not just a config edit:** every real device test from here forward, including the pending approve-path retest, spends real mainnet NIM — keep test amounts small.
 3. **The full approve → broadcast → confirmed loop has still never run end to end against a real device** — the one remaining blocker, per your note, pending real NIM in the wallet. What's now proven for real: the RPC leg (real endpoint, real 60s poll, correct timeout result). What's still unproven: the wallet-approval leg, and the "included and confirmed" happy path against a real transaction — a genuinely broadcast-but-pending transaction has never been checked, only a hash that was never broadcast at all (`DECISIONS.md` #6's "one nuance" note).
-4. ~~Test data left on the real deployment~~ ("RPC connectivity test") — **deleted**, via a temporary one-off internal mutation (`convex/_cleanup.ts`) deployed, run once via `npx convex run`, then removed and redeployed away — no permanent delete capability was added to the product's mutation surface. Six other real requests (all "Dinner at Taco Spot," from earlier device-testing sessions) are still on the deployment and were deliberately left alone — not mine to delete without confirmation. Worth a decision before Step 11 rehearsals: keep as realistic dashboard data, or clear them too.
+4. ~~Test data left on the real deployment~~ — **fully resolved (Step 10 pass).** The "RPC connectivity test" request, a leftover Step 4 CLI test, and 4 of the 6 "Dinner at Taco Spot" device-test requests are all deleted (same temporary-mutation-then-remove pattern each time, no permanent delete capability added). 2 "Dinner at Taco Spot" requests deliberately kept, so the dashboard's compare view has realistic data during Step 11 rehearsals instead of showing empty.
 
 ## Step 7 — Failure handling and retry (targeted repair) ✅ DONE (against mocks; real-network retest still pending, same blockers as Step 6)
 
@@ -107,14 +107,16 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 - [ ] Usability pass with a non-technical tester outside the build team; confirm they complete a payment unassisted. **Blocked on wallet funding**, same as Step 5's approve-path retest — a real, non-technical tester cannot complete a real payment against an unfunded wallet. Left unmarked deliberately.
 - [ ] Fix any issues found before Step 10. — depends on the usability pass above; nothing to fix yet since it hasn't run.
 
-## Step 10 — Ship and open-source
+## Step 10 — Ship and open-source ⚠️ PARTIALLY DONE — SEE TWO DISTINCT BLOCKERS BELOW
 
-- [ ] Pick a frontend hosting provider for the static Vite build (separate from Convex, which only hosts the backend). **This is not decided anywhere in the project** — pick one now; it doesn't affect any earlier step.
-- [ ] Set `VITE_APP_URL` to the real deployed domain.
-- [ ] Deploy frontend + Convex backend to production.
-- [ ] Verify both deeplink formats open the app correctly on a real device: `nimiqpay://miniapp?url=...` and `https://nimpay.app/miniapps/open/...`.
-- [ ] Cold-start test: a device that has never opened this Mini App before completes a payment on the first attempt.
-- [ ] Confirm repo is public, MIT-licensed, and matches what's live.
+- [x] Pick a frontend hosting provider for the static Vite build. — **Vercel**, resolved (`DECISIONS.md` #10). Not a fresh choice made now — it's been the live URL since Step 2.
+- [x] Set `VITE_APP_URL` to the real deployed domain. — `https://payback-jet.vercel.app`, set in `.env.local` and as a Vercel production env var since Step 4.
+- [x] Deploy frontend + Convex backend to production. — both live and have been redeployed at every step since.
+- [ ] Verify both deeplink formats open the app correctly on a real device: `nimiqpay://miniapp?url=...` and `https://nimpay.app/miniapps/open/...`. **Not both verifiable yet, and not for the same reason:**
+  - `https://nimpay.app/miniapps/open/...` — **confirmed broken right now**, independent of any device or wallet. Direct HTTP test against the real production link returns 404 "Unknown mini app host": the app isn't listed in Nimiq's Mini Apps directory yet. Fix is an external PR (`nimiq/awesome`'s `src/data/nimiq-mini-apps.json`), not a code change here (`DECISIONS.md` #11).
+  - `nimiqpay://miniapp?url=...` — per Nimiq's own docs, should work today without directory listing (one-time warning, then full SDK access) — but this couldn't be tested in this environment (no device capable of invoking a custom URI scheme). This is a *device* blocker, distinct from wallet funding — it doesn't need a funded wallet, just a phone with Nimiq Pay installed.
+- [ ] Cold-start test: a device that has never opened this Mini App before completes a payment on the first attempt. — **blocked on wallet funding**, same as Step 5/9's pending real-device checks. Left deliberately unmarked.
+- [x] Confirm repo is public, MIT-licensed, and matches what's live. — `https://github.com/Bholdguy/payback`, confirmed public and MIT-licensed at Step 2; kept in sync with every deploy since.
 
 ## Step 11 — Deterministic judge demo
 

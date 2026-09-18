@@ -316,7 +316,7 @@ Enterprise-scale concerns (safe promotion/rollback, automatic regression case cr
 - **Backend/frontend changes:** production deploy of both frontend and backend/store.
 - **Data/API/UI changes:** none; this is an operational step.
 - **Tested by:** cold-start test on a device that has never opened this Mini App before.
-- **Definition of Done:** both deeplink formats verified live. **Note:** frontend hosting provider (where the static Vite build itself deploys — separate from Convex, which hosts the backend) is genuinely not yet decided anywhere in this project; this is a real open item, not resolved by `DECISIONS.md` #2 (that item covers only the backend/store). Pick one at Step 10 — it does not block Steps 1–9.
+- **Definition of Done:** both deeplink formats verified live. **Frontend hosting: resolved, Vercel** (`DECISIONS.md` #10) — it's been the live production URL since Step 2, not a decision deferred to this step after all. **Deeplink verification: partially blocked, and not by wallet funding.** `https://nimpay.app/miniapps/open/<url>` confirmed non-functional right now (`DECISIONS.md` #11) — a direct request against the real production URL returns HTTP 404 "Unknown mini app host," because the app isn't yet listed in Nimiq's Mini Apps directory. Per Nimiq's own docs, this requires an external submission (a PR to `nimiq/awesome`'s `src/data/nimiq-mini-apps.json`), not a code change. `nimiqpay://miniapp?url=<host>` should work today without listing (an unrecognized URL gets a one-time warning, then loads per Nimiq's docs), but this couldn't be verified directly — no device available in this environment to invoke a custom URI scheme.
 
 ### Step 11 — Deterministic judge demo
 
@@ -417,14 +417,14 @@ No sessions, utterances, tool-call logs, replay-run tables, or audit-event table
 Every item this PRD originally deferred is now locked in `DECISIONS.md` and reflected in `TASKS.md`. Kept here as a pointer, not a live list:
 
 1. ~~Rounding rule for split remainders~~ — resolved: `DECISIONS.md` #1 (Step 3).
-2. ~~Backend/store provider choice~~ — resolved: `DECISIONS.md` #2, Convex (Step 4). Does **not** cover frontend hosting — see Step 10's note above, still genuinely open and non-blocking.
+2. ~~Backend/store provider choice~~ — resolved: `DECISIONS.md` #2, Convex (Step 4). Frontend hosting separately resolved too: `DECISIONS.md` #10, Vercel.
 3. ~~Polling interval/mechanism for the confirmation service~~ — resolved: poll-by-hash, 3s interval, 60s timeout (Section 5.4). The numbers themselves remain a logged unsourced-engineering-default (`DECISIONS.md`, Confirmation job mechanism section, open checklist item) — not a blocker, just not to be mistaken for a documented Nimiq fact.
 4. ~~Fixed NIM amount for the Plane 1 demo scenario~~ — resolved: `DECISIONS.md` #3, 80 NIM / 4 participants / 20 NIM each / "Dinner at Taco Spot" (Step 11).
 5. ~~Presenting device for the judge demo~~ — resolved: `DECISIONS.md` #4, confirm day-of, not a blocker (Step 11).
 6. ~~Sort order for the dashboard~~ — resolved: `DECISIONS.md` #5, newest-first (Step 8).
 
-Two items surfaced after this list was first written, also resolved: `getTransactionByHash`'s response shape (`DECISIONS.md` #7) and custom-shares-mismatch behavior (`DECISIONS.md` #8).
+Items surfaced after this list was first written, also resolved: `getTransactionByHash`'s response shape (`DECISIONS.md` #7), custom-shares-mismatch behavior (`DECISIONS.md` #8), and frontend hosting (`DECISIONS.md` #10, Vercel — corrected from this section's earlier claim that it was still open).
 
 ---
 
-**Status:** planning complete. All eight project files (`PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `TESTING.md`, `DEMO.md`, `DECISIONS.md`, `.env.example`, `TASKS.md`) exist in full and are cross-checked against each other. The only genuinely open, non-blocking item left anywhere in the project is frontend hosting provider selection, deferred to Step 10 by design (see that step's Definition of Done above).
+**Status:** build in progress through Step 10. Frontend hosting (Vercel) and backend/store (Convex) are both resolved and live. The genuinely open items left are the ones a device/funded wallet can resolve, not planning gaps: the `nimpay.app` HTTPS deeplink needs an external directory submission (`DECISIONS.md` #11), and the real approve-path payment loop needs a funded wallet (`DECISIONS.md` #9, `TASKS.md` Steps 5/9/11).
