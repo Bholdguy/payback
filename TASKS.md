@@ -98,12 +98,14 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 - [x] Test: two requests render correctly side by side. — same file; each `getRequest` read verified independent and correct.
 - Extracted `useRequesterWallet()` (`src/nimiq/useRequesterWallet.ts`) out of `CreateRequest.tsx`, now shared with `RequesterDashboard.tsx` — same wallet-detection logic, not duplicated a second time.
 
-## Step 9 — Design pass
+## Step 9 — Design pass ⚠️ VISUAL/COPY WORK DONE, USABILITY TEST BLOCKED ON WALLET FUNDING
 
-- [ ] Strip all wallet jargon ("gas," "consensus," "address") from payer-facing screens.
-- [ ] One action per screen.
-- [ ] Usability pass with a non-technical tester outside the build team; confirm they complete a payment unassisted.
-- [ ] Fix any issues found before Step 10.
+- [x] Strip all wallet jargon ("gas," "consensus," "address") from payer-facing screens — applied to all three screens, not just payer-facing, per explicit instruction. No raw address string is shown anywhere in normal rendering (`formatAddressShort` truncates it, framed as "Requested by," never "wallet"/"address"); error copy reworded off "wallet" terminology. "Broadcasting…" is kept verbatim — that's a PRD.md Section 5.3-locked exact label, not jargon to remove.
+- [x] One action per screen — true for `CreateRequest` (single "Request" button; the "Your requests" link is a de-emphasized nav link, not a competing call to action) and its post-generate confirmation ("Share link" primary, "Back" secondary). **Not fully true for `PayerView`**: each participant row carries its own Pay/Retry action, since the data model has no participant-to-device binding (nobody's slot is "yours" until you tap it) — collapsing that to one literal button would mean redesigning the participant-claiming model itself, out of scope for a visual design pass. `RequesterDashboard` is a browse/compare screen by its own stated purpose (Experience C), not a single-action screen, and wasn't forced into that shape.
+- [x] Replaced the inline-style, unstyled markup across all three screens with a shared design system (`src/index.css`): consistent typography scale, card/button/status components, spacing, light/dark mode. Mobile-first (`max-width: 480px`), matching a WebView Mini App rather than the prior desktop-marketing-page leftover from the Vite scaffold.
+- [x] Step 5's on-screen debug panel is no longer visible by default — gated behind an explicit `?debug=1` query parameter (`DEBUG_ENABLED` in `PayerView.tsx`) rather than deleted outright, since it may still be needed for the pending real-device retest. A real user or judge opening the plain shared link will never see it. Flagged as a judgment call: this is a query-param gate, not a strict `import.meta.env.DEV` build-time gate, specifically so it stays available on the same production URL for troubleshooting.
+- [ ] Usability pass with a non-technical tester outside the build team; confirm they complete a payment unassisted. **Blocked on wallet funding**, same as Step 5's approve-path retest — a real, non-technical tester cannot complete a real payment against an unfunded wallet. Left unmarked deliberately.
+- [ ] Fix any issues found before Step 10. — depends on the usability pass above; nothing to fix yet since it hasn't run.
 
 ## Step 10 — Ship and open-source
 

@@ -19,12 +19,12 @@ export function useRequesterWallet() {
         if (Array.isArray(result) && result.length > 0) {
           setWallet(result[0])
         } else {
-          setError('No wallet account available from Nimiq Pay.')
+          setError("We couldn't find an account to use. Please open this in Nimiq Pay.")
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setError('Could not reach the Nimiq wallet — open this app inside Nimiq Pay.')
+          setError('Please open this in Nimiq Pay to continue.')
           console.error(err)
         }
       })

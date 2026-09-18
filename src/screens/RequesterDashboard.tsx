@@ -5,6 +5,13 @@ import type { Id } from '../../convex/_generated/dataModel'
 import { useRequesterWallet } from '../nimiq/useRequesterWallet'
 import { formatLunaAsNim } from '../split/amount'
 
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Not paid yet',
+  broadcast: 'Broadcasting…',
+  paid: 'Paid',
+  failed: 'Not completed',
+}
+
 function ParticipantRow({
   participantId,
   shareAmount,
@@ -17,19 +24,14 @@ function ParticipantRow({
   const { participant, latestEvent, broadcastToConfirmedLatencyMs } = status
 
   return (
-    <li>
-      {formatLunaAsNim(shareAmount)} — {participant.status}
-      {latestEvent && (
-        <span style={{ fontSize: '0.85em', color: '#666' }}>
-          {' '}
-          (broadcast {new Date(latestEvent.broadcast_at).toLocaleTimeString()}
-          {latestEvent.confirmed_at !== null &&
-            `, confirmed ${new Date(latestEvent.confirmed_at).toLocaleTimeString()} — ${(
-              broadcastToConfirmedLatencyMs! / 1000
-            ).toFixed(1)}s`}
-          )
-        </span>
-      )}
+    <li className="participant-row" style={{ padding: '0.5rem 0' }}>
+      <span>{formatLunaAsNim(shareAmount)}</span>
+      <span className={participant.status === 'paid' ? 'status-paid' : 'status-text'}>
+        {STATUS_LABEL[participant.status] ?? participant.status}
+        {latestEvent?.confirmed_at != null && broadcastToConfirmedLatencyMs !== null && (
+          <span className="muted"> · confirmed in {(broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s</span>
+        )}
+      </span>
     </li>
   )
 }
@@ -37,19 +39,17 @@ function ParticipantRow({
 function RequestDetail({ requestId }: { requestId: Id<'requests'> }) {
   const data = useQuery(api.requests.getRequest, { requestId })
 
-  if (data === undefined) return <p>Loading…</p>
-  if (data === null) return <p>This request doesn't exist.</p>
+  if (data === undefined) return <p className="muted">Loading…</p>
+  if (data === null) return <p className="muted">This request doesn't exist.</p>
 
   const { request, participants } = data
 
   return (
-    <div style={{ border: '1px solid #ddd', padding: '1rem', flex: '1 1 260px' }}>
-      <h3>{formatLunaAsNim(request.total_amount)}</h3>
+    <div className="card">
+      <p className="amount-small">{formatLunaAsNim(request.total_amount)}</p>
       <p>{request.memo}</p>
-      <p style={{ fontSize: '0.85em', color: '#666' }}>
-        Created {new Date(request._creationTime).toLocaleString()}
-      </p>
-      <ul>
+      <p className="muted">Created {new Date(request._creationTime).toLocaleString()}</p>
+      <ul className="participant-list" style={{ marginTop: '0.75rem' }}>
         {participants.map((p) => (
           <ParticipantRow key={p._id} participantId={p._id} shareAmount={p.share_amount} />
         ))}
@@ -62,7 +62,9 @@ function RequestDetail({ requestId }: { requestId: Id<'requests'> }) {
  * Requester-side, read-only (ARCHITECTURE.md 2.1: "zero mutation calls").
  * List view with paid/unpaid counts, newest-first (`DECISIONS.md` #5); a
  * detail view per selected request; and a side-by-side compare view when two
- * are selected (Experience C, PRD.md Section 6).
+ * are selected (Experience C, PRD.md Section 6). Keeps the confirmation
+ * timestamps/latency detail (Experience D) — that evidence is this screen's
+ * explicit purpose, not incidental jargon to strip.
  */
 export function RequesterDashboard() {
   const { wallet: requesterWallet, error: walletError } = useRequesterWallet()
@@ -73,10 +75,18 @@ export function RequesterDashboard() {
   const [selected, setSelected] = useState<Id<'requests'>[]>([])
 
   if (walletError) {
-    return <p role="alert">{walletError}</p>
+    return (
+      <main className="screen">
+        <p className="alert alert-error">{walletError}</p>
+      </main>
+    )
   }
   if (requesterWallet === null || requests === undefined) {
-    return <p>Loading…</p>
+    return (
+      <main className="screen">
+        <p className="muted">Loading…</p>
+      </main>
+    )
   }
 
   function toggleSelect(id: Id<'requests'>) {
@@ -88,39 +98,46 @@ export function RequesterDashboard() {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui', padding: '1.5rem' }}>
+    <main className="screen">
+      <a className="top-link" href="/">
+        New request
+      </a>
       <h1>Your requests</h1>
-      <p>
-        <a href="/">New request</a>
-      </p>
 
-      {requests.length === 0 && <p>No requests yet.</p>}
-
-      <ul>
-        {requests.map(({ request, paidCount, totalCount }) => (
-          <li key={request._id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={selected.includes(request._id)}
-                onChange={() => toggleSelect(request._id)}
-              />{' '}
-              {formatLunaAsNim(request.total_amount)} — {request.memo} ({paidCount}/{totalCount}{' '}
-              paid)
-            </label>
-          </li>
-        ))}
-      </ul>
+      {requests.length === 0 ? (
+        <p className="muted">No requests yet.</p>
+      ) : (
+        <>
+          <p className="muted" style={{ marginBottom: '0.75rem' }}>
+            Select up to two to compare.
+          </p>
+          <ul className="request-list card">
+            {requests.map(({ request, paidCount, totalCount }) => (
+              <li key={request._id}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(request._id)}
+                    onChange={() => toggleSelect(request._id)}
+                  />
+                  <span style={{ flex: 1 }}>{request.memo}</span>
+                  <span className="amount-small">{formatLunaAsNim(request.total_amount)}</span>
+                  <span className="muted">
+                    {paidCount}/{totalCount} paid
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {selected.length > 0 && (
-        <>
-          <h2>{selected.length === 2 ? 'Compare' : 'Detail'}</h2>
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            {selected.map((id) => (
-              <RequestDetail key={id} requestId={id} />
-            ))}
-          </div>
-        </>
+        <div className="compare-grid">
+          {selected.map((id) => (
+            <RequestDetail key={id} requestId={id} />
+          ))}
+        </div>
       )}
     </main>
   )

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import type { Id } from '../../convex/_generated/dataModel'
+import { formatAddressShort } from '../nimiq/formatAddress'
 import { isInsideNimiqPay, sendBasicTransactionWithData } from '../nimiq/provider'
 import { formatLunaAsNim } from '../split/amount'
 
@@ -9,6 +10,13 @@ type LocalAttemptState =
   | { kind: 'idle' }
   | { kind: 'sending' }
   | { kind: 'error'; message: string }
+
+// Diagnostic-only, added during Step 5's silent-failure investigation (the
+// test device had no remote debugging, so on-screen logging was the only way
+// to see what was happening). Never shown to a real user or judge — only
+// when ?debug=1 is explicitly added to the URL.
+const DEBUG_ENABLED =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1'
 
 /**
  * Reads the live confirmation event for a paid participant, to surface
@@ -18,7 +26,7 @@ type LocalAttemptState =
 function PaidLatency({ participantId }: { participantId: Id<'participants'> }) {
   const status = useQuery(api.paymentEvents.getParticipantStatus, { participantId })
   if (!status || status.broadcastToConfirmedLatencyMs === null) return null
-  return <> (confirmed in {(status.broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s)</>
+  return <> · {(status.broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s</>
 }
 
 /**
@@ -43,24 +51,34 @@ export function PayerView({ requestId }: { requestId: string }) {
   const log = (message: string) => {
     const line = `${new Date().toISOString().slice(11, 23)} ${message}`
     console.log(`[PayerView] ${message}`)
-    setDebugLog((prev) => [...prev, line])
+    if (DEBUG_ENABLED) setDebugLog((prev) => [...prev, line])
   }
 
   if (!isInsideNimiqPay()) {
     return (
-      <main style={{ fontFamily: 'system-ui', padding: '1.5rem' }}>
-        <h1>Open this in Nimiq Pay</h1>
-        <p>This payment request only works inside the Nimiq Pay app.</p>
+      <main className="screen">
+        <div className="card stack">
+          <h1>Open this in Nimiq Pay</h1>
+          <p className="muted">This payment link only works inside the Nimiq Pay app.</p>
+        </div>
       </main>
     )
   }
 
   if (data === undefined) {
-    return <p>Loading…</p>
+    return (
+      <main className="screen">
+        <p className="muted">Loading…</p>
+      </main>
+    )
   }
 
   if (data === null) {
-    return <p>This request doesn't exist.</p>
+    return (
+      <main className="screen">
+        <p className="muted">This request doesn't exist.</p>
+      </main>
+    )
   }
 
   const { request, participants } = data
@@ -111,9 +129,7 @@ export function PayerView({ requestId }: { requestId: string }) {
           ...prev,
           [participantId]: {
             kind: 'error',
-            message: `Payment was sent, but we couldn't record it: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
+            message: "Your payment went through, but we couldn't record it. Please let the organizer know.",
           },
         }))
       }
@@ -134,72 +150,66 @@ export function PayerView({ requestId }: { requestId: string }) {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui', padding: '1.5rem' }}>
-      <h1>{formatLunaAsNim(request.total_amount)} requested</h1>
-      <p>
-        <strong>Memo:</strong> {request.memo}
-      </p>
-      <p>
-        <strong>From:</strong> {request.requester_wallet}
-      </p>
-      <ul>
+    <main className="screen stack">
+      <div>
+        <h1>{request.memo}</h1>
+        <p className="muted">
+          {formatLunaAsNim(request.total_amount)} total · Requested by{' '}
+          {formatAddressShort(request.requester_wallet)}
+        </p>
+      </div>
+
+      <ul className="participant-list">
         {participants.map((p) => {
           const attempt = attempts[p._id] ?? { kind: 'idle' as const }
           return (
-            <li key={p._id} style={{ marginBottom: '0.75rem' }}>
-              {formatLunaAsNim(p.share_amount)} —{' '}
-              {p.status === 'pending' && attempt.kind !== 'sending' && (
-                <button type="button" onClick={() => pay(p._id, p.share_amount)}>
-                  Pay
-                </button>
-              )}
-              {attempt.kind === 'sending' && 'Waiting for approval…'}
-              {p.status === 'broadcast' && 'Broadcasting…'}
-              {p.status === 'paid' && (
-                <>
-                  Paid
-                  <PaidLatency participantId={p._id} />
-                </>
-              )}
-              {p.status === 'failed' && attempt.kind === 'idle' && (
-                <>
-                  Payment not completed.{' '}
-                  <button type="button" onClick={() => pay(p._id, p.share_amount)}>
-                    Retry
-                  </button>
-                </>
-              )}
-              {attempt.kind === 'error' && (
-                <span role="alert" style={{ display: 'block', color: 'crimson' }}>
-                  {attempt.message}{' '}
-                  <button type="button" onClick={() => pay(p._id, p.share_amount)}>
-                    Retry
-                  </button>
+            <li key={p._id} className="card stack" style={{ gap: '0.5rem' }}>
+              <div className="participant-row" style={{ padding: 0 }}>
+                <span className="amount-small">{formatLunaAsNim(p.share_amount)}</span>
+
+                <span>
+                  {p.status === 'pending' && attempt.kind !== 'sending' && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-small"
+                      onClick={() => pay(p._id, p.share_amount)}
+                    >
+                      Pay
+                    </button>
+                  )}
+                  {attempt.kind === 'sending' && (
+                    <span className="status-text">Waiting for approval…</span>
+                  )}
+                  {p.status === 'broadcast' && <span className="status-text">Broadcasting…</span>}
+                  {p.status === 'paid' && (
+                    <span className="status-paid">
+                      Paid
+                      <PaidLatency participantId={p._id} />
+                    </span>
+                  )}
+                  {(p.status === 'failed' || attempt.kind === 'error') &&
+                    attempt.kind !== 'sending' && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-small"
+                        onClick={() => pay(p._id, p.share_amount)}
+                      >
+                        Try again
+                      </button>
+                    )}
                 </span>
+              </div>
+              {attempt.kind === 'error' && (
+                <p role="alert" className="alert alert-error" style={{ margin: 0 }}>
+                  {attempt.message}
+                </p>
               )}
             </li>
           )
         })}
       </ul>
 
-      {/* Temporary diagnostic panel for the Step 5 silent-failure investigation
-          (no remote debugging available on the test device — this is the only
-          way to see what's happening step by step). Not part of the product
-          UI; safe to remove once the payment trigger issue is confirmed fixed. */}
-      {debugLog.length > 0 && (
-        <pre
-          style={{
-            marginTop: '2rem',
-            padding: '0.75rem',
-            background: '#f4f3ec',
-            fontSize: '0.75rem',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
-          {debugLog.join('\n')}
-        </pre>
-      )}
+      {DEBUG_ENABLED && debugLog.length > 0 && <pre className="debug-panel">{debugLog.join('\n')}</pre>}
     </main>
   )
 }

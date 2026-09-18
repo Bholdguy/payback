@@ -51,29 +51,29 @@ export function CreateRequest() {
     const links = APP_URL ? generateRequestLinks(generated.requestId, APP_URL) : null
 
     return (
-      <main style={{ fontFamily: 'system-ui', padding: '1.5rem' }}>
-        <h1>Request generated</h1>
-        <p>This request is now frozen — sharing this link never changes its amount.</p>
-        <ul>
-          {generated.shares.map((share, i) => (
-            <li key={i}>
-              Participant {i + 1}: {formatLunaAsNim(share)}
-            </li>
-          ))}
-        </ul>
+      <main className="screen stack">
+        <div className="card stack">
+          <h1>Request sent</h1>
+          <p className="muted">This amount is locked in — sharing the link won't change it.</p>
+          <ul className="participant-list">
+            {generated.shares.map((share, i) => (
+              <li key={i} className="participant-row">
+                <span>Person {i + 1}</span>
+                <span className="amount-small">{formatLunaAsNim(share)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
         {links ? (
-          <>
-            <p>
-              <a href={links.appRequestUrl}>{links.appRequestUrl}</a>
-            </p>
-            <p>
-              <a href={links.nimiqPayDeeplink}>Open in Nimiq Pay</a>
-            </p>
-          </>
+          <a className="btn btn-primary" href={links.nimiqPayDeeplink}>
+            Share link
+          </a>
         ) : (
-          <p role="alert">VITE_APP_URL is not set — cannot build a shareable link.</p>
+          <p className="alert alert-error">Sharing isn't set up for this deployment yet.</p>
         )}
-        <button type="button" onClick={() => setGenerated(null)}>
+
+        <button type="button" className="btn btn-secondary" onClick={() => setGenerated(null)}>
           Back
         </button>
       </main>
@@ -81,79 +81,95 @@ export function CreateRequest() {
   }
 
   return (
-    <main style={{ fontFamily: 'system-ui', padding: '1.5rem', maxWidth: 420 }}>
-      <h1>New request</h1>
-      <p>
-        <a href="/dashboard">View your requests</a>
+    <main className="screen">
+      <a className="top-link" href="/dashboard">
+        Your requests
+      </a>
+
+      <h1>Request money</h1>
+      <p className="muted" style={{ marginBottom: '1.25rem' }}>
+        Split a bill and get paid straight to your account.
       </p>
 
-      <label style={{ display: 'block', marginBottom: '1rem' }}>
-        Total (NIM)
-        <input
-          type="text"
-          inputMode="decimal"
-          value={totalInput}
-          onChange={(e) => setTotalInput(e.target.value)}
-        />
-      </label>
+      <div className="stack">
+        <div className="field">
+          <label htmlFor="total">Total amount (NIM)</label>
+          <input
+            id="total"
+            type="text"
+            inputMode="decimal"
+            value={totalInput}
+            onChange={(e) => setTotalInput(e.target.value)}
+          />
+        </div>
 
-      <label style={{ display: 'block', marginBottom: '1rem' }}>
-        Participants
-        <input
-          type="text"
-          inputMode="numeric"
-          value={participantCountInput}
-          onChange={(e) => setParticipantCountInput(e.target.value)}
-        />
-      </label>
+        <div className="field">
+          <label htmlFor="participants">Split between how many people?</label>
+          <input
+            id="participants"
+            type="text"
+            inputMode="numeric"
+            value={participantCountInput}
+            onChange={(e) => setParticipantCountInput(e.target.value)}
+          />
+        </div>
 
-      <label style={{ display: 'block', marginBottom: '1rem' }}>
-        Memo
-        <input type="text" value={memo} onChange={(e) => setMemo(e.target.value)} />
-      </label>
+        <div className="field">
+          <label htmlFor="memo">What's it for?</label>
+          <input
+            id="memo"
+            type="text"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="Dinner at Taco Spot"
+          />
+        </div>
 
-      <section style={{ marginBottom: '1rem' }}>
-        <h2>Preview</h2>
-        {preview.shares ? (
-          <ul>
-            {preview.shares.map((share, i) => (
-              <li key={i}>
-                Participant {i + 1}: {formatLunaAsNim(share)}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p role="alert">{preview.error}</p>
-        )}
-      </section>
+        <div className="card">
+          <h2>Each person pays</h2>
+          {preview.shares ? (
+            <ul className="participant-list">
+              {preview.shares.map((share, i) => (
+                <li key={i} className="participant-row">
+                  <span>Person {i + 1}</span>
+                  <span className="amount-small">{formatLunaAsNim(share)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="alert alert-error">{preview.error}</p>
+          )}
+        </div>
 
-      {walletError && <p role="alert">{walletError}</p>}
-      {submitError && <p role="alert">{submitError}</p>}
+        {walletError && <p className="alert alert-error">{walletError}</p>}
+        {submitError && <p className="alert alert-error">{submitError}</p>}
 
-      <button
-        type="button"
-        disabled={!canGenerate}
-        onClick={async () => {
-          if (!preview.shares || preview.totalLuna === null || !requesterWallet) return
-          setIsSubmitting(true)
-          setSubmitError(null)
-          try {
-            const requestId = await createRequest({
-              requesterWallet,
-              total: preview.totalLuna,
-              memo: memo.trim(),
-              participantCount: Number(participantCountInput),
-            })
-            setGenerated({ requestId, shares: preview.shares })
-          } catch (err) {
-            setSubmitError(err instanceof Error ? err.message : String(err))
-          } finally {
-            setIsSubmitting(false)
-          }
-        }}
-      >
-        {isSubmitting ? 'Generating…' : 'Generate'}
-      </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!canGenerate}
+          onClick={async () => {
+            if (!preview.shares || preview.totalLuna === null || !requesterWallet) return
+            setIsSubmitting(true)
+            setSubmitError(null)
+            try {
+              const requestId = await createRequest({
+                requesterWallet,
+                total: preview.totalLuna,
+                memo: memo.trim(),
+                participantCount: Number(participantCountInput),
+              })
+              setGenerated({ requestId, shares: preview.shares })
+            } catch (err) {
+              setSubmitError(err instanceof Error ? err.message : String(err))
+            } finally {
+              setIsSubmitting(false)
+            }
+          }}
+        >
+          {isSubmitting ? 'Sending…' : 'Request'}
+        </button>
+      </div>
     </main>
   )
 }
