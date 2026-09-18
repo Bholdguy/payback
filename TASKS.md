@@ -42,15 +42,20 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 - [x] Test: opening the same link twice always shows the same frozen amount. — `convex/requests.test.ts`, plus verified manually against the real cloud deployment (`npx convex run`, two reads, byte-identical).
 - [x] Test: link opened on a second device shows identical data. — same test; cross-device is simulated as two independent reads, which is what the frozen data model guarantees regardless of caller.
 
-## Step 5 — Wallet-mediated payment action
+## Step 5 — Wallet-mediated payment action ⚠️ CODE DONE, DoD NOT FULLY MET (see note)
 
-- [ ] Build `src/nimiq/provider.ts`: wraps `init`, `listAccounts`, `isConsensusEstablished`, `getBlockNumber`, `sendBasicTransactionWithData`.
-- [ ] Build `PayerView.tsx`: reads frozen request via `getRequest`, renders verbatim (no local recomputation).
-- [ ] On tap pay: call `sendBasicTransactionWithData({ recipient: requester_wallet, value: share_amount_luna, data: memo })`.
-- [ ] Implement `recordBroadcast` mutation: writes `payment_events` row (`tx_hash`, `broadcast_at`, `confirmed_at = null`), flips `participants.status` to `broadcast`. Scoped so a payer can only record their own `participant_id` (`ARCHITECTURE.md` Section 2.3).
-- [ ] Handle `PermissionDeniedError` and `InvalidTransactionError` (both documented at `nimiq.dev/mini-apps/api-reference/nimiq-provider`) — no mutation call on either, UI falls back to retry.
-- [ ] Blocked-path UI: if opened outside Nimiq Pay, render a plain explainer instead of attempting `init()` and failing.
+- [x] Build `src/nimiq/provider.ts`: wraps `init`, `listAccounts`, `isConsensusEstablished`, `getBlockNumber`, `sendBasicTransactionWithData`.
+- [x] Build `PayerView.tsx`: reads frozen request via `getRequest`, renders verbatim (no local recomputation).
+- [x] On tap pay: call `sendBasicTransactionWithData({ recipient: requester_wallet, value: share_amount_luna, data: memo })`.
+- [x] Implement `recordBroadcast` mutation: writes `payment_events` row (`tx_hash`, `broadcast_at`, `confirmed_at = null`), flips `participants.status` to `broadcast`. Scoping note: there is no login/session anywhere in this system and `participants` has no payer-wallet binding field, so "own `participant_id`" is enforced as "a slot already broadcast/paid can't be re-claimed," not as per-caller identity — see `convex/paymentEvents.ts`.
+- [x] Handle rejection: **revised per a real-device finding (`DECISIONS.md` #9)** — `PermissionDeniedError`/`InvalidTransactionError` are named on `nimiq.dev`'s API reference but exist in neither the installed SDK's source nor a confirmed real-device log. The trigger is now behavioral ("did not resolve with a tx hash"), not class-matched; no mutation call on a non-success outcome, UI falls back to retry.
+- [x] Blocked-path UI: if opened outside Nimiq Pay, render a plain explainer instead of attempting `init()` and failing. — `isInsideNimiqPay()` checks `window.nimiq` synchronously, matching the SDK's own `init()` implementation.
 - [ ] Test: approve path, reject path, invalid-transaction path all produce the correct state transition (`TESTING.md` Section 4) — confirm no path here ever writes `paid` directly.
+  - [x] Reject path: confirmed on a real device (native "Confirm Transaction" dialog, explicit Reject button) — correct UI state, other participants unaffected, no false-paid. Exact rejected-value shape unverified (no remote debugging on that device); logged as a disclosed gap, not guessed at (`DECISIONS.md` #9).
+  - [ ] Approve path on a real device: unit-tested via `convex-test` mocks (`convex/paymentEvents.test.ts`), but not yet confirmed with an actual wallet approval + `recordBroadcast` write on-device in this build.
+  - [ ] Invalid-transaction / insufficient-balance path: deliberately skipped to avoid risking the funded testnet wallet with time remaining. Untested, not simulated — logged as an open gap (`DECISIONS.md` #9), not closed out.
+
+**Status note:** the reject path's app-level behavior is confirmed correct on a real device, and the code is unit-tested end to end, but Step 5's Definition of Done ("all three SDK-level paths produce the correct state transition") is not yet fully met — the approve path hasn't been confirmed on-device in this build, and the invalid-transaction/insufficient-balance path is untested by deliberate choice. Treat as a known, disclosed gap rather than a pass.
 
 ## Step 6 — Status read-back (confirmation job)
 

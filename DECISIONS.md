@@ -34,6 +34,20 @@ This is now the complete decision log for the 24-hour build. Every open item PRD
 
 ---
 
+## Discrepancy found and only partially resolved while building Step 5 (wallet-mediated payment action)
+
+9. **`PermissionDeniedError`/`InvalidTransactionError` were never confirmed to exist as real thrown/rejected values — only cited from a docs page.** PRD.md Section 0 and (until this pass) Section 5.3 stated, as verified fact, that `sendBasicTransactionWithData()` throws `PermissionDeniedError` on user rejection and `InvalidTransactionError` on a malformed/unpayable transaction, citing `nimiq.dev/mini-apps/api-reference/nimiq-provider`. Two independent checks now contradict treating that as confirmed:
+   - **Static check:** neither class exists anywhere in the installed `@nimiq/mini-app-sdk@0.1.0` package (checked `dist/provider.d.ts` and both bundled `dist/provider.js`/`.cjs` outputs directly, not just the type declarations). The package's own types show `sendBasicTransactionWithData` *resolving* to `string | ErrorResponse` (`ErrorResponse = { error: { type: string; message: string } }`), never throwing a named class. This alone isn't a contradiction — the SDK is a thin RPC relay, and real error behavior could be produced by whatever adapter Nimiq Pay injects into the WebView at runtime, outside this package's static types.
+   - **Real-device check (Step 5):** tapping "Reject" on the native "Confirm Transaction" dialog (explicit Confirm/Reject buttons, not a swipe-dismiss) produced correct app-level behavior — the rejected participant's `PayerView` showed "Payment not completed. Try again." with a working retry, the other three participants were unaffected, and no participant ever showed a false-paid status. **But** the test device had no remote-debugging access, so the actual rejected/resolved value was never captured from a raw console log — only inferred from correct on-screen behavior. Insufficient-balance was not tested at all, skipped deliberately to avoid risking the funded testnet wallet with the time remaining in the build.
+
+   **Resolution taken:** `PRD.md` Section 5.3's `failed` trigger condition is rewritten to be behavioral — "`sendBasicTransactionWithData()` does not resolve with a successful transaction hash" — rather than naming specific error classes. `src/nimiq/provider.ts`'s `sendBasicTransactionWithData` wrapper is written to handle either a thrown value or a resolved non-string result, and treats both identically as `{ kind: 'error' }`, which is exactly why the app-level behavior above came out correct even without knowing the exact shape: the code was never actually depending on the named classes PRD.md cited, only on "did a string tx hash come back or not."
+
+   **What remains genuinely unverified, not guessed at:**
+   - The exact shape `sendBasicTransactionWithData()` produces on user rejection inside real Nimiq Pay (thrown value vs. resolved `ErrorResponse`, and its exact fields) — needs a device with remote debugging, or a build with a visible in-app error-shape logger, to close out.
+   - The insufficient-balance path — entirely untested against a real wallet, not just the shape but the behavior. Treat as an open risk until deliberately tested (e.g., on a testnet wallet fully drained on purpose, not the funded one used for the rest of the demo).
+
+---
+
 ## Confirmation job mechanism (Step 6 / PRD Section 5.4)
 
 **Decision:** poll-by-hash, not N-block-confirmation depth.
@@ -42,7 +56,7 @@ After a `broadcast` `payment_events` row is written, the backend polls Nimiq Alb
 
 **Why poll-by-hash over requiring N confirmations past inclusion:** N-confirmation depth exists to protect against a block being reorged out after inclusion. For a same-day, non-custodial social-payment product at this vertical's stakes, that additional latency isn't matched by a corresponding trust benefit — the product's actual promise (PRD Section 1) is that "paid" reflects a real broadcast transaction actually included on-chain, not that "paid" survives an adversarial reorg scenario. If this product's scope ever expands to larger amounts or a setting where reorg risk matters, N-confirmation depth is the documented upgrade path (PRD Section 13).
 
-**Verified against documentation:** `nimiq.dev/mini-apps/api-reference/nimiq-provider` documents `PermissionDeniedError` ("user rejected the confirmation dialog") and `InvalidTransactionError` ("transaction data malformed") as the named error types for `sendBasicTransactionWithData()`, confirming the `failed` trigger conditions in PRD Section 5.3/5.4. Neither that page nor `nimiq.dev/protocol/` documents a macro-block finality duration; `nimiq.dev/protocol/` states a "1-second block separation" for micro blocks and describes a Tendermint-style macro-block voting process (2f+1 validator agreement), but gives no explicit time-to-finality.
+**Documentation claim, since revised — see item #9 above:** `nimiq.dev/mini-apps/api-reference/nimiq-provider` documents `PermissionDeniedError` ("user rejected the confirmation dialog") and `InvalidTransactionError` ("transaction data malformed") as named error types for `sendBasicTransactionWithData()`. This was originally treated here as confirming the `failed` trigger condition in PRD Section 5.3; a real-device test during Step 5 could only confirm the app-level behavior on rejection, not the named classes themselves (neither exists in the installed SDK's source either) — PRD Section 5.3's trigger condition is now stated behaviorally instead of by class name. Neither that page nor `nimiq.dev/protocol/` documents a macro-block finality duration; `nimiq.dev/protocol/` states a "1-second block separation" for micro blocks and describes a Tendermint-style macro-block voting process (2f+1 validator agreement), but gives no explicit time-to-finality.
 
 ### Open items
 
