@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as confirmation from "../confirmation.js";
+import type * as lib_transactionResult from "../lib/transactionResult.js";
 import type * as paymentEvents from "../paymentEvents.js";
 import type * as requests from "../requests.js";
 
@@ -18,6 +20,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  confirmation: typeof confirmation;
+  "lib/transactionResult": typeof lib_transactionResult;
   paymentEvents: typeof paymentEvents;
   requests: typeof requests;
 }>;

@@ -11,6 +11,17 @@ type LocalAttemptState =
   | { kind: 'error'; message: string }
 
 /**
+ * Reads the live confirmation event for a paid participant, to surface
+ * `broadcast_to_confirmed_latency_ms` (PRD.md Section 5.4's metric — the
+ * evidence that "Broadcasting…" was real elapsed time, not UI theater).
+ */
+function PaidLatency({ participantId }: { participantId: Id<'participants'> }) {
+  const status = useQuery(api.paymentEvents.getParticipantStatus, { participantId })
+  if (!status || status.broadcastToConfirmedLatencyMs === null) return null
+  return <> (confirmed in {(status.broadcastToConfirmedLatencyMs / 1000).toFixed(1)}s)</>
+}
+
+/**
  * Payer-side screen (ARCHITECTURE.md 2.1), reached via `/r/<request_id>`.
  * Renders the frozen request exactly as stored (no recomputation) and, on
  * "Pay", calls `sendBasicTransactionWithData()` with the frozen amount and
@@ -144,7 +155,12 @@ export function PayerView({ requestId }: { requestId: string }) {
               )}
               {attempt.kind === 'sending' && 'Waiting for approval…'}
               {p.status === 'broadcast' && 'Broadcasting…'}
-              {p.status === 'paid' && 'Paid'}
+              {p.status === 'paid' && (
+                <>
+                  Paid
+                  <PaidLatency participantId={p._id} />
+                </>
+              )}
               {p.status === 'failed' && 'Failed'}
               {attempt.kind === 'error' && (
                 <span role="alert" style={{ display: 'block', color: 'crimson' }}>
