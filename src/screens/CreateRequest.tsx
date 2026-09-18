@@ -3,11 +3,53 @@ import { useMemo, useState } from 'react'
 import { api } from '../../convex/_generated/api'
 import { timeGreeting } from '../greeting'
 import { useRequesterWallet } from '../nimiq/useRequesterWallet'
-import { generateRequestLinks } from '../request/RequestLinkGenerator'
+import { generateRequestLinks, type RequestLinks } from '../request/RequestLinkGenerator'
 import { AmountParseError, formatLunaAsNim, parseNimToLuna } from '../split/amount'
 import { SplitCalculatorError, splitCalculator } from '../split/SplitCalculator'
 
 const APP_URL = import.meta.env.VITE_APP_URL as string | undefined
+
+/**
+ * The payer link, always shown as visible/selectable text plus a "Copy
+ * link" button (Clipboard API) — the one thing that reliably works inside a
+ * WebView. `nimiqpay://...` is offered as a secondary option, not the only
+ * path: navigating to it from *inside* Nimiq Pay's own WebView (a
+ * self-referential custom-scheme link) is exactly the case that silently
+ * produced no visible result when this screen briefly relied on it alone.
+ */
+function ShareLinks({ links }: { links: RequestLinks }) {
+  const [copied, setCopied] = useState(false)
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(links.appRequestUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable/denied — the visible URL text below is
+      // the fallback of last resort, so this failure isn't fatal.
+    }
+  }
+
+  return (
+    <div className="stack">
+      <div className="card">
+        <p className="muted" style={{ marginBottom: '0.4rem' }}>
+          Or select the link directly
+        </p>
+        <p style={{ wordBreak: 'break-all', userSelect: 'all', fontSize: '0.85rem' }}>
+          {links.appRequestUrl}
+        </p>
+      </div>
+      <a className="btn btn-secondary" href={links.nimiqPayDeeplink}>
+        Open in Nimiq Pay
+      </a>
+      <button type="button" className="btn btn-primary cta-float" onClick={copyLink}>
+        {copied ? 'Copied!' : 'Copy link'}
+      </button>
+    </div>
+  )
+}
 
 /**
  * Requester-side screen (ARCHITECTURE.md 2.1): collects total, participant
@@ -72,11 +114,7 @@ export function CreateRequest() {
           ))}
         </ul>
 
-        {links ? (
-          <a className="btn btn-primary cta-float" href={links.nimiqPayDeeplink}>
-            Share link
-          </a>
-        ) : (
+        {links ? <ShareLinks links={links} /> : (
           <p className="alert alert-error">Sharing isn't set up for this deployment yet.</p>
         )}
 
