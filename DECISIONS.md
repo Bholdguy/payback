@@ -43,8 +43,18 @@ This is now the complete decision log for the 24-hour build. Every open item PRD
    **Resolution taken:** `PRD.md` Section 5.3's `failed` trigger condition is rewritten to be behavioral — "`sendBasicTransactionWithData()` does not resolve with a successful transaction hash" — rather than naming specific error classes. `src/nimiq/provider.ts`'s `sendBasicTransactionWithData` wrapper is written to handle either a thrown value or a resolved non-string result, and treats both identically as `{ kind: 'error' }`, which is exactly why the app-level behavior above came out correct even without knowing the exact shape: the code was never actually depending on the named classes PRD.md cited, only on "did a string tx hash come back or not."
 
    **What remains genuinely unverified, not guessed at:**
-   - The exact shape `sendBasicTransactionWithData()` produces on user rejection inside real Nimiq Pay (thrown value vs. resolved `ErrorResponse`, and its exact fields) — needs a device with remote debugging, or a build with a visible in-app error-shape logger, to close out.
+   - The exact shape `sendBasicTransactionWithData()` produces on user rejection specifically inside real Nimiq Pay (see the confirmed-shape update just below — what's now confirmed is a different trigger, a sync failure, not the Reject-button path) — needs a device with remote debugging, or a build with a visible in-app error-shape logger, to close out.
    - The insufficient-balance path — entirely untested against a real wallet, not just the shape but the behavior. Treat as an open risk until deliberately tested (e.g., on a testnet wallet fully drained on purpose, not the funded one used for the rest of the demo).
+
+   **Update — one real thrown shape now confirmed, from a different trigger than expected.** The Step 5 silent-failure investigation (on-screen logging added to `PayerView.tsx` after remote debugging proved unavailable) caught a real device throwing:
+   ```json
+   {"code":-32603,"message":"Failed to send payment transaction: Something went wrong syncing your account"}
+   ```
+   This is a **wallet account-sync failure**, not a user rejection or an insufficient-balance case — it fired before any native confirmation dialog appeared at all, consistent with the `isConsensusEstablished() === false` result already observed and logged (at the time, non-blockingly) back in Step 2's diagnostic. That earlier result should have been read as a leading indicator, not a passable state: consensus/sync failing on-device blocks real payments outright.
+
+   This shape is notable for matching **neither** of the two candidates PRD.md/this codebase had been defending against: it's not a named `PermissionDeniedError`/`InvalidTransactionError` class, and it's not the SDK's own documented `ErrorResponse = { error: { type, message } }` shape either. It's a flatter JSON-RPC-2.0-style error object (`{ code: number, message: string }`), thrown, not resolved. `src/nimiq/provider.ts`'s `describeUnknown()`/generic `{ kind: 'error' }` handling was written defensively enough that this real (fourth) shape was still handled correctly without any code change — `PayerView` showed "Payment not completed. Try again." exactly as designed, confirming the behavioral (not class-matched) `failed` trigger condition in `PRD.md` Section 5.3 is the right design, independent of which specific shape eventually shows up.
+
+   The Reject-button-specific shape and the insufficient-balance path both remain unconfirmed as of this entry; retesting the approve path is pending the wallet finishing sync on the test device.
 
 ---
 

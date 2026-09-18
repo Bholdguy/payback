@@ -19,7 +19,7 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 - [x] `npm install @nimiq/mini-app-sdk`.
 - [x] Call `init({ timeout: 10_000 })` on app load.
 - [x] Confirm `nimiq.listAccounts()` resolves inside Nimiq Pay — confirmed on real device, returned a real wallet address.
-- [x] Confirm `nimiq.isConsensusEstablished()` resolves inside Nimiq Pay — confirmed on real device, resolved `false` (a valid state; the call itself succeeded).
+- [x] Confirm `nimiq.isConsensusEstablished()` resolves inside Nimiq Pay — confirmed on real device, resolved `false` (the call itself succeeded, so Step 2's DoD — the call resolves — was genuinely met). **Correction from Step 5:** at the time this was read as fully non-blocking; it wasn't. A `false` result turned out to be the leading indicator of the exact wallet-sync failure that later blocked a real payment attempt in Step 5 (`DECISIONS.md` #9). `PayerView` does not yet gate the Pay button on this value — worth revisiting so a payer sees "wallet still syncing" up front instead of only after a failed send.
 - [x] Manual load test on a real device inside Nimiq Pay (`nimiq.dev/mini-apps/development/load-local-mini-app`) — done via the live Vercel deployment (`https://payback-jet.vercel.app`), not a tunnel.
 - [x] Create the public GitHub repository, MIT license, named per the competition's open-source rule — `https://github.com/Bholdguy/payback`, MIT license confirmed by GitHub.
 
