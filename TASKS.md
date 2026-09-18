@@ -6,6 +6,12 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 
 ---
 
+## Final pre-submission status
+
+**The approve → broadcast → confirmed loop was never completed end-to-end on a real device** — wallet funding wasn't available before the deadline. Verified for real on-device: `init`/`listAccounts`/`isConsensusEstablished` (Step 2), the reject path and a real wallet-sync failure both handled correctly (Step 5), and the RPC connection against live mainnet running a full real confirmation-job cycle (Step 6). Not verified: an actual successful payment reaching `paid`. See `DECISIONS.md`'s matching entry for the full statement.
+
+---
+
 ## Step 1 — Lock the product contract
 
 - [ ] Write `CONTRACT.md`: the product thesis (`PRD.md` Section 3) + the 8 owned jobs (`PRD.md` Section 1), in one paragraph.

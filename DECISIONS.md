@@ -4,6 +4,20 @@ This is now the complete decision log for the 24-hour build. Every open item PRD
 
 ---
 
+## Final pre-submission status (real-device verification, plainly stated)
+
+**The approve → broadcast → confirmed loop was never completed end-to-end on a real device.** Wallet funding was not available before the deadline. No real payment has ever gone from "tap Pay" to a `paid` status backed by a real on-chain confirmation in this build. That is the single largest gap between "built and tested" and "proven in the field," and it is stated here plainly rather than implied away by everything else that *was* verified.
+
+**What WAS verified on a real device, inside Nimiq Pay:**
+- `init()`, `listAccounts()`, and `isConsensusEstablished()` all resolve (Step 2).
+- The reject path: tapping "Reject" on the native confirmation dialog produces the correct app-level outcome — "Payment not completed," retry offered, other participants unaffected, no false-paid status (Step 5).
+- A real wallet-sync failure (`{"code":-32603,"message":"...syncing your account"}`), thrown before any dialog appeared, was also handled correctly by the same generic failure path (Step 5).
+- The RPC connection itself: a real request, broadcast with a syntactically-valid but never-actually-broadcast tx hash, correctly ran the full 60-second confirmation job against the live `rpc.nimiqwatch.com` mainnet endpoint and resolved to the correct timeout outcome (Step 6).
+
+**What remains theoretical, not yet observed:** a successful payment — the native dialog approved, a real tx hash returned, `recordBroadcast` writing a `broadcast` row, the confirmation job observing real inclusion with `executionResult === true`, and `participants.status` flipping to `paid`. Every piece of that path is unit-tested against mocks and code-reviewed against the live deployed function list, but none of it has been watched happen for real, together, in sequence. Until a funded wallet closes this out, "Paid" is a state this build can produce in tests and reason about correctly, not one it has been observed producing from a genuine transaction.
+
+---
+
 ## Locked decisions (final planning pass)
 
 1. **Rounding rule for split remainders:** leftover Luna after an even split go entirely to the first participant in the list (index 0, in requester-entry order). `SplitCalculator` never drops a remainder and never distributes it fractionally across participants.
