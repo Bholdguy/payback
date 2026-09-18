@@ -1,18 +1,57 @@
-import { useMemo, useState } from 'react'
+import { init } from '@nimiq/mini-app-sdk'
+import { useMutation } from 'convex/react'
+import { useEffect, useMemo, useState } from 'react'
+import { api } from '../../convex/_generated/api'
+import { generateRequestLinks } from '../request/RequestLinkGenerator'
 import { AmountParseError, formatLunaAsNim, parseNimToLuna } from '../split/amount'
 import { SplitCalculatorError, splitCalculator } from '../split/SplitCalculator'
 
+const APP_URL = import.meta.env.VITE_APP_URL as string | undefined
+
 /**
  * Requester-side screen (ARCHITECTURE.md 2.1): collects total, participant
- * count, and memo, and previews the per-person split live, client-side, with
- * SplitCalculator. Nothing is persisted here — request creation/freezing
- * (createRequest mutation, Convex) is Step 4's job, not this screen's.
+ * count, and memo; previews the per-person split live, client-side, with
+ * SplitCalculator; on "Generate" calls the `createRequest` mutation, which
+ * re-runs the split server-side and freezes the request permanently.
  */
 export function CreateRequest() {
+  const createRequest = useMutation(api.requests.createRequest)
+
   const [totalInput, setTotalInput] = useState('80')
   const [participantCountInput, setParticipantCountInput] = useState('4')
   const [memo, setMemo] = useState('Dinner at Taco Spot')
-  const [generated, setGenerated] = useState<{ shares: number[]; memo: string } | null>(null)
+  const [generated, setGenerated] = useState<{ requestId: string; shares: number[] } | null>(
+    null,
+  )
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [requesterWallet, setRequesterWallet] = useState<string | null>(null)
+  const [walletError, setWalletError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    init({ timeout: 10_000 })
+      .then((provider) => provider.listAccounts())
+      .then((result) => {
+        if (cancelled) return
+        if (Array.isArray(result) && result.length > 0) {
+          setRequesterWallet(result[0])
+        } else {
+          setWalletError('No wallet account available from Nimiq Pay.')
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setWalletError(
+            'Could not reach the Nimiq wallet — open this app inside Nimiq Pay to create a request.',
+          )
+          console.error(err)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const preview = useMemo(() => {
     try {
@@ -22,28 +61,25 @@ export function CreateRequest() {
         throw new SplitCalculatorError('participant count must be a whole number')
       }
       const shares = splitCalculator({ total: totalLuna, participantCount })
-      return { shares, error: null as string | null }
+      return { shares, totalLuna, error: null as string | null }
     } catch (err) {
       if (err instanceof AmountParseError || err instanceof SplitCalculatorError) {
-        return { shares: null, error: err.message }
+        return { shares: null, totalLuna: null, error: err.message }
       }
       throw err
     }
   }, [totalInput, participantCountInput])
 
-  const canGenerate = preview.shares !== null && memo.trim() !== ''
+  const canGenerate =
+    preview.shares !== null && memo.trim() !== '' && !isSubmitting && requesterWallet !== null
 
   if (generated) {
+    const links = APP_URL ? generateRequestLinks(generated.requestId, APP_URL) : null
+
     return (
       <main style={{ fontFamily: 'system-ui', padding: '1.5rem' }}>
-        <h1>Request generated (local preview only)</h1>
-        <p>
-          This is a frozen preview, not yet saved anywhere — shareable links and
-          cross-device persistence arrive in Step 4.
-        </p>
-        <p>
-          <strong>Memo:</strong> {generated.memo}
-        </p>
+        <h1>Request generated</h1>
+        <p>This request is now frozen — sharing this link never changes its amount.</p>
         <ul>
           {generated.shares.map((share, i) => (
             <li key={i}>
@@ -51,6 +87,18 @@ export function CreateRequest() {
             </li>
           ))}
         </ul>
+        {links ? (
+          <>
+            <p>
+              <a href={links.appRequestUrl}>{links.appRequestUrl}</a>
+            </p>
+            <p>
+              <a href={links.nimiqPayDeeplink}>Open in Nimiq Pay</a>
+            </p>
+          </>
+        ) : (
+          <p role="alert">VITE_APP_URL is not set — cannot build a shareable link.</p>
+        )}
         <button type="button" onClick={() => setGenerated(null)}>
           Back
         </button>
@@ -102,15 +150,32 @@ export function CreateRequest() {
         )}
       </section>
 
+      {walletError && <p role="alert">{walletError}</p>}
+      {submitError && <p role="alert">{submitError}</p>}
+
       <button
         type="button"
         disabled={!canGenerate}
-        onClick={() => {
-          if (!preview.shares) return
-          setGenerated({ shares: preview.shares, memo: memo.trim() })
+        onClick={async () => {
+          if (!preview.shares || preview.totalLuna === null || !requesterWallet) return
+          setIsSubmitting(true)
+          setSubmitError(null)
+          try {
+            const requestId = await createRequest({
+              requesterWallet,
+              total: preview.totalLuna,
+              memo: memo.trim(),
+              participantCount: Number(participantCountInput),
+            })
+            setGenerated({ requestId, shares: preview.shares })
+          } catch (err) {
+            setSubmitError(err instanceof Error ? err.message : String(err))
+          } finally {
+            setIsSubmitting(false)
+          }
         }}
       >
-        Generate
+        {isSubmitting ? 'Generating…' : 'Generate'}
       </button>
     </main>
   )
