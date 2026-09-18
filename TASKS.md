@@ -13,23 +13,23 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 - [ ] Confirm every teammate can repeat it from memory before writing any code.
 - [ ] Confirm nothing outside the 8 jobs gets scheduled into a later step.
 
-## Step 2 — Scaffold the Mini App
+## Step 2 — Scaffold the Mini App ✅ DONE
 
-- [ ] `npm create vite@latest` with the React template.
-- [ ] `npm install @nimiq/mini-app-sdk`.
-- [ ] Call `init({ timeout: 10_000 })` on app load.
-- [ ] Confirm `nimiq.listAccounts()` resolves inside Nimiq Pay.
-- [ ] Confirm `nimiq.isConsensusEstablished()` resolves inside Nimiq Pay.
-- [ ] Manual load test on a real device inside Nimiq Pay (`nimiq.dev/mini-apps/development/load-local-mini-app`).
-- [ ] Create the public GitHub repository, MIT license, named per the competition's open-source rule.
+- [x] `npm create vite@latest` with the React template (react-ts, to match `provider.ts` in `ARCHITECTURE.md`).
+- [x] `npm install @nimiq/mini-app-sdk`.
+- [x] Call `init({ timeout: 10_000 })` on app load.
+- [x] Confirm `nimiq.listAccounts()` resolves inside Nimiq Pay — confirmed on real device, returned a real wallet address.
+- [x] Confirm `nimiq.isConsensusEstablished()` resolves inside Nimiq Pay — confirmed on real device, resolved `false` (a valid state; the call itself succeeded).
+- [x] Manual load test on a real device inside Nimiq Pay (`nimiq.dev/mini-apps/development/load-local-mini-app`) — done via the live Vercel deployment (`https://payback-jet.vercel.app`), not a tunnel.
+- [x] Create the public GitHub repository, MIT license, named per the competition's open-source rule — `https://github.com/Bholdguy/payback`, MIT license confirmed by GitHub.
 
-## Step 3 — Split calculator + request creation screen
+## Step 3 — Split calculator + request creation screen ✅ DONE
 
-- [ ] Implement `SplitCalculator` (pure, Luna-denominated — 1 NIM = 100,000 Luna, `PRD.md` Section 0): even split, custom shares.
-- [ ] Apply the locked rounding rule (`DECISIONS.md` #1): remainder Luna go entirely to participant index 0.
-- [ ] Build `CreateRequest.tsx`: total, participant count, memo, generate button; live preview of per-person amount before generating.
-- [ ] Unit tests per `TESTING.md` Section 1 (even, uneven/remainder, single participant, zero/negative rejected, custom shares matching/not-matching total, determinism).
-- [ ] Confirm remainder cents are never silently dropped (business-outcome assertion, not just "returns a number").
+- [x] Implement `SplitCalculator` (pure, Luna-denominated — 1 NIM = 100,000 Luna, `PRD.md` Section 0): even split, custom shares. — `src/split/SplitCalculator.ts`
+- [x] Apply the locked rounding rule (`DECISIONS.md` #1): remainder Luna go entirely to participant index 0.
+- [x] Build `CreateRequest.tsx`: total, participant count, memo, generate button; live preview of per-person amount before generating. — `src/screens/CreateRequest.tsx` (generate produces a local frozen preview only; persistence is Step 4)
+- [x] Unit tests per `TESTING.md` Section 1 (even, uneven/remainder, single participant, zero/negative rejected, custom shares matching/not-matching total, determinism, safe-integer boundary). — `src/split/SplitCalculator.test.ts`, 12/12 passing (`npm test`)
+- [x] Confirm remainder cents are never silently dropped (business-outcome assertion, not just "returns a number") — test asserts index 0 specifically receives the remainder AND the sum still equals the total.
 
 ## Step 4 — Request state + shareable link
 
