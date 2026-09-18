@@ -27,20 +27,20 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 
 - [x] Implement `SplitCalculator` (pure, Luna-denominated — 1 NIM = 100,000 Luna, `PRD.md` Section 0): even split, custom shares. — `src/split/SplitCalculator.ts`
 - [x] Apply the locked rounding rule (`DECISIONS.md` #1): remainder Luna go entirely to participant index 0.
-- [x] Build `CreateRequest.tsx`: total, participant count, memo, generate button; live preview of per-person amount before generating. — `src/screens/CreateRequest.tsx` (generate produces a local frozen preview only; persistence is Step 4)
+- [x] Build `CreateRequest.tsx`: total, participant count, memo, generate button; live preview of per-person amount before generating. — `src/screens/CreateRequest.tsx` (as of Step 4, generate now persists via the real `createRequest` mutation)
 - [x] Unit tests per `TESTING.md` Section 1 (even, uneven/remainder, single participant, zero/negative rejected, custom shares matching/not-matching total, determinism, safe-integer boundary). — `src/split/SplitCalculator.test.ts`, 12/12 passing (`npm test`)
 - [x] Confirm remainder cents are never silently dropped (business-outcome assertion, not just "returns a number") — test asserts index 0 specifically receives the remainder AND the sum still equals the total.
 
-## Step 4 — Request state + shareable link
+## Step 4 — Request state + shareable link ✅ DONE
 
-- [ ] Set up Convex project; add `CONVEX_DEPLOYMENT` / `VITE_CONVEX_URL` locally (`.env.example`) — provider locked: Convex (`DECISIONS.md` #2).
-- [ ] Define `requests` and `participants` tables per `PRD.md` Section 9.
-- [ ] Implement `createRequest` mutation: server-side `SplitCalculator` re-run (don't trust a client-computed split), writes both tables in one transaction, returns `request_id`.
-- [ ] Implement `getRequest` query.
-- [ ] Implement `RequestLinkGenerator`: both deeplink formats (`nimiqpay://miniapp?url=...` and `https://nimpay.app/miniapps/open/...`), using `VITE_APP_URL`.
-- [ ] Confirm no `updateRequest` mutation exists anywhere (the frozen-request invariant is enforced by absence of a write path — `SECURITY.md` Section 3).
-- [ ] Test: opening the same link twice always shows the same frozen amount.
-- [ ] Test: link opened on a second device shows identical data.
+- [x] Set up Convex project; add `CONVEX_DEPLOYMENT` / `VITE_CONVEX_URL` locally (`.env.example`) — provider locked: Convex (`DECISIONS.md` #2). Real cloud dev deployment `bholdguyyy161:payback:main` (`stoic-squirrel-945.convex.cloud`) — not the CLI's anonymous local-only default, which would have been unreachable from a payer's phone.
+- [x] Define `requests` and `participants` tables per `PRD.md` Section 9. — `convex/schema.ts`
+- [x] Implement `createRequest` mutation: server-side `SplitCalculator` re-run (don't trust a client-computed split), writes both tables in one transaction, returns `request_id`. — `convex/requests.ts`
+- [x] Implement `getRequest` query. — `convex/requests.ts`
+- [x] Implement `RequestLinkGenerator`: both deeplink formats (`nimiqpay://miniapp?url=...` and `https://nimpay.app/miniapps/open/...`), using `VITE_APP_URL`. — `src/request/RequestLinkGenerator.ts`
+- [x] Confirm no `updateRequest` mutation exists anywhere (the frozen-request invariant is enforced by absence of a write path — `SECURITY.md` Section 3). — asserted in `convex/requests.test.ts` against the generated API surface.
+- [x] Test: opening the same link twice always shows the same frozen amount. — `convex/requests.test.ts`, plus verified manually against the real cloud deployment (`npx convex run`, two reads, byte-identical).
+- [x] Test: link opened on a second device shows identical data. — same test; cross-device is simulated as two independent reads, which is what the frozen data model guarantees regardless of caller.
 
 ## Step 5 — Wallet-mediated payment action
 
