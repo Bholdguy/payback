@@ -75,13 +75,16 @@ Related docs, all self-contained: `PRD.md`, `ARCHITECTURE.md`, `SECURITY.md`, `T
 1. **`NIMIQ_RPC_URL` has never been provisioned anywhere** (not `.env.local`, not the Convex deployment). This is a pre-existing gap from before Step 1 (`DECISIONS.md` #6), not something Step 6 introduced — but Step 6 is the first step that actually needs it to do anything real. Every real `recordBroadcast` right now schedules a `confirmationJob` that will immediately throw and leave the participant stuck at `broadcast` forever (deliberately — see the "config gap, not a transaction fact" test — but stuck is still stuck until this is set).
 2. **The full approve → broadcast → confirmed loop has never run end to end against a real device or a real network**, per your note — deferred pending real NIM in the test wallet, tracked as a separate task. All of Step 6's logic is verified correct against mocked RPC responses (7 tests), but "correct against a mock" and "verified against Albatross" are different claims, and only the first is true right now.
 
-## Step 7 — Failure handling and retry (targeted repair)
+## Step 7 — Failure handling and retry (targeted repair) ✅ DONE (against mocks; real-network retest still pending, same blockers as Step 6)
 
-- [ ] Catch `PermissionDeniedError` / `InvalidTransactionError` / confirmation-job timeout; render a clear, non-alarming "payment not completed, try again" state.
-- [ ] Implement retry: re-fires `sendBasicTransactionWithData()` with the identical frozen amount and memo, producing a **new `tx_hash`** and a **new `broadcast_at`**, written as a new `payment_events` row for the same `participant_id` — never reusing the old `tx_hash` (`PRD.md` Section 5.4 retry invariant).
-- [ ] Confirm this does not conflict with the frozen-request invariant: retries apply to a transaction *attempt* (`payment_events`), never to the request or split (`requests`/`participants`).
-- [ ] Test: cancel → retry → approve; confirm final state is `paid` exactly once, and the earlier failed row's `confirmed_at` stays `null` permanently.
-- [ ] Test: one participant's failure never blocks or corrupts the other participants' state.
+- [x] Catch rejection / confirmation-job timeout; render a clear, non-alarming "payment not completed, try again" state. — behavioral trigger, not class-matched, per Step 5's revised design (`DECISIONS.md` #9).
+- [x] Implement retry: re-fires `sendBasicTransactionWithData()` with the identical frozen amount and memo, producing a **new `tx_hash`** and a **new `broadcast_at`**, written as a new `payment_events` row for the same `participant_id` — never reusing the old `tx_hash` (`PRD.md` Section 5.4 retry invariant). — held true by construction (`recordBroadcast` always inserts, never patches an existing event); confirmed by test, not just by design.
+- [x] **Real gap found and fixed while closing out this step:** `PayerView` had no retry affordance when `participants.status === 'failed'` was set by the confirmationJob's timeout (Step 6) rather than by a same-session client-side error — a payer reopening the link after a timeout would see "Failed" with no way to act. Fixed: a Retry button now renders whenever `status === 'failed'`, regardless of local client state.
+- [x] Confirm this does not conflict with the frozen-request invariant: retries apply to a transaction *attempt* (`payment_events`), never to the request or split (`requests`/`participants`). — untouched; no code path here writes to `requests`/`participants`' frozen fields.
+- [x] Test: cancel → retry → approve; confirm final state is `paid` exactly once, and the earlier failed row's `confirmed_at` stays `null` permanently. — `convex/retry.test.ts`, simulating timeout-then-retry-then-confirm end to end; asserts both rows explicitly, not just the final status.
+- [x] Test: one participant's failure never blocks or corrupts the other participants' state. — same file.
+
+**Same disclosed blocker as Step 6:** all of the above is verified against mocked RPC responses; the retry flow has not been exercised against a real device or a real confirmation-job timeout in production (`NIMIQ_RPC_URL` still unset).
 
 ## Step 8 — Requester dashboard (replay/compare)
 

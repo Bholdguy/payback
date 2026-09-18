@@ -161,7 +161,14 @@ export function PayerView({ requestId }: { requestId: string }) {
                   <PaidLatency participantId={p._id} />
                 </>
               )}
-              {p.status === 'failed' && 'Failed'}
+              {p.status === 'failed' && attempt.kind === 'idle' && (
+                <>
+                  Payment not completed.{' '}
+                  <button type="button" onClick={() => pay(p._id, p.share_amount)}>
+                    Retry
+                  </button>
+                </>
+              )}
               {attempt.kind === 'error' && (
                 <span role="alert" style={{ display: 'block', color: 'crimson' }}>
                   {attempt.message}{' '}
